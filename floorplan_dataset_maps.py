@@ -67,10 +67,10 @@ class FloorplanGraphDataset(Dataset):
 		self.split = split
 		self.target_set = target_set
 		if split == 'train':
-			self.subgraphs = np.load('{}/train_data.npy'.format(self.shapes_path), allow_pickle=True)
+			self.subgraphs = np.load(self.shapes_path + 'train_data.npy', allow_pickle=True)
 			self.augment = True
 		elif split == 'eval':
-			self.subgraphs = np.load('{}/train_data.npy'.format(self.shapes_path), allow_pickle=True)
+			self.subgraphs = np.load(self.shapes_path + 'train_data.npy', allow_pickle=True)
 			self.augment = False
 		else:
 			print('Error split not supported')        

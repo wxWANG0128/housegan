@@ -37,8 +37,8 @@ parser.add_argument("--exp_folder", type=str, default='exp', help="destination f
 opt = parser.parse_args()
 print(opt)
 
-numb_iters = 200000
-exp_name = 'exp_with_graph_global_new'
+numb_iters = 500000
+exp_name = 'exp_demo'
 target_set = 'D'
 phase='eval'
 checkpoint = './checkpoints/{}_{}_{}.pth'.format(exp_name, target_set, numb_iters)
@@ -177,7 +177,7 @@ generator.load_state_dict(torch.load(checkpoint))
 cuda = True if torch.cuda.is_available() else False
 if cuda:
     generator.cuda()
-rooms_path = '/local-scratch4/nnauata/autodesk/FloorplanDataset/'
+rooms_path = './data/'
 
 # Initialize dataset iterator
 fp_dataset_test = FloorplanGraphDataset(rooms_path, transforms.Normalize(mean=[0.5], std=[0.5]), target_set=target_set, split=phase)

@@ -21,12 +21,12 @@ from models import Discriminator, Generator, compute_gradient_penalty, weights_i
 
 parser = argparse.ArgumentParser()
 parser.add_argument("--n_epochs", type=int, default=1000000, help="number of epochs of training")
-parser.add_argument("--batch_size", type=int, default=32, help="size of the batches")
+parser.add_argument("--batch_size", type=int, default=24, help="size of the batches")
 parser.add_argument("--g_lr", type=float, default=0.0001, help="adam: learning rate")
 parser.add_argument("--d_lr", type=float, default=0.0001, help="adam: learning rate")
 parser.add_argument("--b1", type=float, default=0.5, help="adam: decay of first order momentum of gradient")
 parser.add_argument("--b2", type=float, default=0.999, help="adam: decay of first order momentum of gradient")
-parser.add_argument("--n_cpu", type=int, default=8, help="number of cpu threads to use during batch generation")
+parser.add_argument("--n_cpu", type=int, default=20, help="number of cpu threads to use during batch generation")
 parser.add_argument("--latent_dim", type=int, default=128, help="dimensionality of the latent space")
 parser.add_argument("--img_size", type=int, default=32, help="size of each image dimension")
 parser.add_argument("--sample_interval", type=int, default=50000, help="interval between image sampling")
@@ -35,9 +35,13 @@ parser.add_argument("--n_critic", type=int, default=1, help="number of training 
 parser.add_argument("--target_set", type=str, default='A', help="which split to remove")
 opt = parser.parse_args()
 
-cuda = True if torch.cuda.is_available() else False
+if torch.cuda.is_available():
+    device = 'cuda:0'
+else:
+    device = 'cpu'
+
 lambda_gp = 10
-multi_gpu = True
+multi_gpu = False
 # exp_folder = "{}_{}_g_lr_{}_d_lr_{}_bs_{}_ims_{}_ld_{}_b1_{}_b2_{}".format(opt.exp_folder, opt.target_set, opt.g_lr, opt.d_lr, \
 #                                                                         opt.batch_size, opt.img_size, \
 #                                                                         opt.latent_dim, opt.b1, opt.b2)
@@ -53,11 +57,11 @@ adversarial_loss = torch.nn.BCEWithLogitsLoss()
 generator = Generator()
 discriminator = Discriminator()
 
-if cuda:
+if torch.cuda.is_available():
     generator.cuda()
     discriminator.cuda()
 
-if cuda:
+if torch.cuda.is_available():
     generator.cuda()
     discriminator.cuda()
     adversarial_loss.cuda()
@@ -87,13 +91,13 @@ def graph_scatter(inputs, device_ids, indices):
         if len(inputs) > 3:
             inds = torch.where((nd_to_sample>=shift[i])&(nd_to_sample<shift[i+1]))[0]
             w_split = (w[inds]-shift[i]).long()            
-            _out = (x_split.to(device_ids[i]), \
-                    y_split.to(device_ids[i]), \
-                    z_split.to(device_ids[i]), \
+            _out = (x_split.to(device_ids[i]),
+                    y_split.to(device_ids[i]),
+                    z_split.to(device_ids[i]),
                     w_split.to(device_ids[i]))
         else:   
-            _out = (x_split.to(device_ids[i]), \
-                    y_split.to(device_ids[i]), \
+            _out = (x_split.to(device_ids[i]),
+                    y_split.to(device_ids[i]),
                     z_split.to(device_ids[i]))
         outputs.append(_out)
     return outputs
@@ -116,30 +120,31 @@ def visualizeSingleBatch(fp_loader_test, opt):
     with torch.no_grad():
         # Unpack batch
         mks, nds, eds, nd_to_sample, ed_to_sample = next(iter(fp_loader_test))
-        real_mks = Variable(mks.type(Tensor))
-        given_nds = Variable(nds.type(Tensor))
+        real_mks = Variable(mks.to(dtype=torch.float, device=device))
+        given_nds = Variable(nds.to(dtype=torch.float, device=device))
         given_eds = eds
                                     
         # Generate a batch of images
         z_shape = [real_mks.shape[0], opt.latent_dim]
-        z = Variable(Tensor(np.random.normal(0, 1, tuple(z_shape))))
+        z = torch.from_numpy(np.random.normal(0, 1, tuple(z_shape)))
+        z = Variable(z.to(dtype=torch.float, device=device))
         gen_mks = generator(z, given_nds, given_eds)
             
         # Generate image tensors
-        real_imgs_tensor = combine_images_maps(real_mks, given_nds, given_eds, \
+        real_imgs_tensor = combine_images_maps(real_mks, given_nds, given_eds,
                                                nd_to_sample, ed_to_sample)
-        fake_imgs_tensor = combine_images_maps(gen_mks, given_nds, given_eds, \
+        fake_imgs_tensor = combine_images_maps(gen_mks, given_nds, given_eds,
                                                nd_to_sample, ed_to_sample)
 
         # Save images
-        save_image(real_imgs_tensor, "./exps/{}/{}_real.png".format(exp_folder, batches_done), \
+        save_image(real_imgs_tensor, "./exps/{}/{}_real.png".format(exp_folder, batches_done),
                    nrow=12, normalize=False)
-        save_image(fake_imgs_tensor, "./exps/{}/{}_fake.png".format(exp_folder, batches_done), \
+        save_image(fake_imgs_tensor, "./exps/{}/{}_fake.png".format(exp_folder, batches_done),
                    nrow=12, normalize=False)
     return
 
 # Configure data loader
-rooms_path = '/home/nelson/Workspace/autodesk/housegan/'
+rooms_path = './data/'
 fp_dataset_train = FloorplanGraphDataset(rooms_path, transforms.Normalize(mean=[0.5], std=[0.5]), target_set=opt.target_set)
 fp_loader = torch.utils.data.DataLoader(fp_dataset_train, 
                                         batch_size=opt.batch_size, 
@@ -157,7 +162,7 @@ fp_loader_test = torch.utils.data.DataLoader(fp_dataset_test,
 # Optimizers
 optimizer_G = torch.optim.Adam(generator.parameters(), lr=opt.g_lr, betas=(opt.b1, opt.b2)) 
 optimizer_D = torch.optim.Adam(discriminator.parameters(), lr=opt.d_lr, betas=(opt.b1, opt.b2))
-Tensor = torch.cuda.FloatTensor if cuda else torch.FloatTensor
+#Tensor = torch.cuda.FloatTensor if cuda else torch.FloatTensor
 
 # ----------
 #  Training
@@ -172,14 +177,14 @@ for epoch in range(opt.n_epochs):
         
         # Adversarial ground truths
         batch_size = torch.max(nd_to_sample) + 1
-        valid = Variable(Tensor(batch_size, 1)\
-                         .fill_(1.0), requires_grad=False)
-        fake = Variable(Tensor(batch_size, 1)\
-                        .fill_(0.0), requires_grad=False)
+        valid = torch.ones([batch_size, 1], dtype=torch.float, device=device, requires_grad=False)
+        #valid = Variable(Tensor(batch_size, 1).fill_(1.0), requires_grad=False)
+        fake = torch.zeros([batch_size, 1], dtype=torch.float, device=device, requires_grad=False)
+        #fake = Variable(Tensor(batch_size, 1).fill_(0.0), requires_grad=False)
     
         # Configure input
-        real_mks = Variable(mks.type(Tensor))
-        given_nds = Variable(nds.type(Tensor))
+        real_mks = Variable(mks.to(dtype=torch.float, device=device))
+        given_nds = Variable(nds.to(dtype=torch.float, device=device))
         given_eds = eds
         
         # Set grads on
@@ -193,7 +198,9 @@ for epoch in range(opt.n_epochs):
 
         # Generate a batch of images
         z_shape = [real_mks.shape[0], opt.latent_dim]
-        z = Variable(Tensor(np.random.normal(0, 1, tuple(z_shape))))
+        z = torch.from_numpy(np.random.normal(0, 1, tuple(z_shape)))
+        z = Variable(z.to(dtype=torch.float, device=device))
+
         if multi_gpu:
             gen_mks = data_parallel(generator, (z, given_nds, given_eds), indices)
         else:
@@ -201,36 +208,35 @@ for epoch in range(opt.n_epochs):
         
         # Real images
         if multi_gpu:
-            real_validity = data_parallel(discriminator, \
-                                         (real_mks, given_nds, \
-                                          given_eds, nd_to_sample), \
+            real_validity = data_parallel(discriminator,
+                                         (real_mks, given_nds,
+                                          given_eds, nd_to_sample),
                                           indices)
         else:
             real_validity = discriminator(real_mks, given_nds, given_eds, nd_to_sample)
             
         # Fake images
         if multi_gpu:
-            fake_validity = data_parallel(discriminator, \
-                                         (gen_mks.detach(), given_nds.detach(), \
-                                          given_eds.detach(), nd_to_sample.detach()),\
+            fake_validity = data_parallel(discriminator,
+                                         (gen_mks.detach(), given_nds.detach(),
+                                          given_eds.detach(), nd_to_sample.detach()),
                                           indices)
         else:
-            fake_validity = discriminator(gen_mks.detach(), given_nds.detach(), \
+            fake_validity = discriminator(gen_mks.detach(), given_nds.detach(),
                                           given_eds.detach(), nd_to_sample.detach())
     
         # Measure discriminator's ability to classify real from generated samples
         if multi_gpu:
-            gradient_penalty = compute_gradient_penalty(discriminator, real_mks.data, \
-                                                        gen_mks.data, given_nds.data, \
-                                                        given_eds.data, nd_to_sample.data,\
+            gradient_penalty = compute_gradient_penalty(discriminator, real_mks.data,
+                                                        gen_mks.data, given_nds.data,
+                                                        given_eds.data, nd_to_sample.data,
                                                         data_parallel, ed_to_sample.data)
         else:
-            gradient_penalty = compute_gradient_penalty(discriminator, real_mks.data, \
-                                                        gen_mks.data, given_nds.data, \
-                                                        given_eds.data, nd_to_sample.data, \
+            gradient_penalty = compute_gradient_penalty(discriminator, real_mks.data,
+                                                        gen_mks.data, given_nds.data,
+                                                        given_eds.data, nd_to_sample.data,
                                                         None, None)
-        d_loss = -torch.mean(real_validity) + torch.mean(fake_validity) \
-                 + lambda_gp * gradient_penalty
+        d_loss = -torch.mean(real_validity) + torch.mean(fake_validity) + lambda_gp * gradient_penalty
 
         # Update discriminator
         d_loss.backward()
@@ -249,14 +255,15 @@ for epoch in range(opt.n_epochs):
         if i % opt.n_critic == 0:
             
             # Generate a batch of images
-            z = Variable(Tensor(np.random.normal(0, 1, tuple(z_shape))))
+            z = torch.from_numpy(np.random.normal(0, 1, tuple(z_shape)))
+            z = Variable(z.to(dtype=torch.float, device=device))
             gen_mks = generator(z, given_nds, given_eds)
 
             # Score fake images
             if multi_gpu:
-                fake_validity = data_parallel(discriminator, \
-                                             (gen_mks, given_nds, \
-                                              given_eds, nd_to_sample), \
+                fake_validity = data_parallel(discriminator,
+                                             (gen_mks, given_nds,
+                                              given_eds, nd_to_sample),
                                               indices)
             else:
                 fake_validity = discriminator(gen_mks, given_nds, given_eds, nd_to_sample)

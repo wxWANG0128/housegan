@@ -2,6 +2,7 @@ import argparse
 import os
 import numpy as np
 import math
+import time
 
 from floorplan_dataset_maps import FloorplanGraphDataset, floorplan_collate_fn
 import torchvision.transforms as transforms
@@ -169,6 +170,7 @@ optimizer_D = torch.optim.Adam(discriminator.parameters(), lr=opt.d_lr, betas=(o
 # ----------
 batches_done = 0
 for epoch in range(opt.n_epochs):
+    t0 = time.time()
     for i, batch in enumerate(fp_loader):
         
         # Unpack batch
@@ -195,7 +197,6 @@ for epoch in range(opt.n_epochs):
         #  Train Discriminator
         # ---------------------
         optimizer_D.zero_grad()
-
         # Generate a batch of images
         z_shape = [real_mks.shape[0], opt.latent_dim]
         z = torch.from_numpy(np.random.normal(0, 1, tuple(z_shape)))
@@ -275,6 +276,9 @@ for epoch in range(opt.n_epochs):
 
             print("[Epoch %d/%d] [Batch %d/%d] [D loss: %f] [G loss: %f]"
                 % (epoch, opt.n_epochs, i, len(fp_loader), d_loss.item(), g_loss.item()))
+            if i == 100:
+                t = time.time() - t0
+                print(t)
 
             if (batches_done % opt.sample_interval == 0) and batches_done:
                 torch.save(generator.state_dict(), './checkpoints/{}_{}.pth'.format(exp_folder, batches_done))

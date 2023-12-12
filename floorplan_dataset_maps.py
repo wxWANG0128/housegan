@@ -171,8 +171,7 @@ class FloorplanGraphDataset(Dataset):
         rot_center = (image_shape-1)/2.
         org = xy-org_center
         a = np.deg2rad(angle)
-        new = np.array([org[0]*np.cos(a) + org[1]*np.sin(a),
-                -org[0]*np.sin(a) + org[1]*np.cos(a) ])
+        new = np.array([org[0]*np.cos(a) + org[1]*np.sin(a) - org[0]*np.sin(a) + org[1]*np.cos(a)])
         new = new+rot_center
         return new
 
@@ -256,7 +255,7 @@ def floorplan_collate_fn(batch):
     all_node_to_sample, all_edge_to_sample = [], []
     node_offset = 0
     for i, (rooms_mks, nodes, edges) in enumerate(batch):
-        O, T = nodes.size(0), edges.size(0)
+        O, T = nodes.size(0), edges.size(0)                             # O: nodes T: edges
         all_rooms_mks.append(rooms_mks)
         all_nodes.append(nodes)
         edges = edges.clone()

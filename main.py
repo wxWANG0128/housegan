@@ -22,7 +22,7 @@ from models import Discriminator, Generator, compute_gradient_penalty, weights_i
 
 parser = argparse.ArgumentParser()
 parser.add_argument("--n_epochs", type=int, default=1000000, help="number of epochs of training")
-parser.add_argument("--batch_size", type=int, default=24, help="size of the batches")
+parser.add_argument("--batch_size", type=int, default=32, help="size of the batches")
 parser.add_argument("--g_lr", type=float, default=0.0001, help="adam: learning rate")
 parser.add_argument("--d_lr", type=float, default=0.0001, help="adam: learning rate")
 parser.add_argument("--b1", type=float, default=0.5, help="adam: decay of first order momentum of gradient")
@@ -33,7 +33,7 @@ parser.add_argument("--img_size", type=int, default=32, help="size of each image
 parser.add_argument("--sample_interval", type=int, default=50000, help="interval between image sampling")
 parser.add_argument("--exp_folder", type=str, default='exp', help="destination folder")
 parser.add_argument("--n_critic", type=int, default=1, help="number of training steps for discriminator per iter")
-parser.add_argument("--target_set", type=str, default='A', help="which split to remove")
+parser.add_argument("--target_set", type=str, default='D', help="which split to remove")
 opt = parser.parse_args()
 
 if torch.cuda.is_available():
@@ -174,15 +174,13 @@ for epoch in range(opt.n_epochs):
     for i, batch in enumerate(fp_loader):
         
         # Unpack batch
-        mks, nds, eds, nd_to_sample, ed_to_sample = batch
+        mks, nds, eds, nd_to_sample, ed_to_sample = batch                        # room_masks; nodes; edges; nodes_to_sample; edges_to_sample
         indices = nd_to_sample, ed_to_sample
         
         # Adversarial ground truths
         batch_size = torch.max(nd_to_sample) + 1
         valid = torch.ones([batch_size, 1], dtype=torch.float, device=device, requires_grad=False)
-        #valid = Variable(Tensor(batch_size, 1).fill_(1.0), requires_grad=False)
         fake = torch.zeros([batch_size, 1], dtype=torch.float, device=device, requires_grad=False)
-        #fake = Variable(Tensor(batch_size, 1).fill_(0.0), requires_grad=False)
     
         # Configure input
         real_mks = Variable(mks.to(dtype=torch.float, device=device))
@@ -223,8 +221,7 @@ for epoch in range(opt.n_epochs):
                                           given_eds.detach(), nd_to_sample.detach()),
                                           indices)
         else:
-            fake_validity = discriminator(gen_mks.detach(), given_nds.detach(),
-                                          given_eds.detach(), nd_to_sample.detach())
+            fake_validity = discriminator(gen_mks.detach(), given_nds.detach(), given_eds.detach(), nd_to_sample.detach())
     
         # Measure discriminator's ability to classify real from generated samples
         if multi_gpu:

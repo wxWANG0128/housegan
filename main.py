@@ -22,7 +22,7 @@ from models import Discriminator, Generator, compute_gradient_penalty, weights_i
 
 parser = argparse.ArgumentParser()
 parser.add_argument("--n_epochs", type=int, default=1000000, help="number of epochs of training")
-parser.add_argument("--batch_size", type=int, default=32, help="size of the batches")
+parser.add_argument("--batch_size", type=int, default=40, help="size of the batches")
 parser.add_argument("--g_lr", type=float, default=0.0001, help="adam: learning rate")
 parser.add_argument("--d_lr", type=float, default=0.0001, help="adam: learning rate")
 parser.add_argument("--b1", type=float, default=0.5, help="adam: decay of first order momentum of gradient")
@@ -30,10 +30,11 @@ parser.add_argument("--b2", type=float, default=0.999, help="adam: decay of firs
 parser.add_argument("--n_cpu", type=int, default=20, help="number of cpu threads to use during batch generation")
 parser.add_argument("--latent_dim", type=int, default=128, help="dimensionality of the latent space")
 parser.add_argument("--img_size", type=int, default=32, help="size of each image dimension")
-parser.add_argument("--sample_interval", type=int, default=50000, help="interval between image sampling")
+parser.add_argument("--sample_interval", type=int, default=100, help="interval between image sampling")
 parser.add_argument("--exp_folder", type=str, default='exp', help="destination folder")
-parser.add_argument("--n_critic", type=int, default=1, help="number of training steps for discriminator per iter")
+parser.add_argument("--n_critic", type=int, default=10, help="number of training steps for discriminator per iter")
 parser.add_argument("--target_set", type=str, default='D', help="which split to remove")
+parser.add_argument("--print_every", type = int, default=200)
 opt = parser.parse_args()
 
 if torch.cuda.is_available():
@@ -51,9 +52,6 @@ os.makedirs("./exps/"+exp_folder, exist_ok=True)
 os.makedirs("./checkpoints/", exist_ok=True)
 os.makedirs("./temp/", exist_ok=True)
 
-# Loss function
-adversarial_loss = torch.nn.BCEWithLogitsLoss()
-
 # Initialize generator and discriminator
 generator = Generator()
 discriminator = Discriminator()
@@ -61,11 +59,6 @@ discriminator = Discriminator()
 if torch.cuda.is_available():
     generator.cuda()
     discriminator.cuda()
-
-if torch.cuda.is_available():
-    generator.cuda()
-    discriminator.cuda()
-    adversarial_loss.cuda()
 
 # Support to multiple GPUs
 def graph_scatter(inputs, device_ids, indices):
@@ -270,15 +263,13 @@ for epoch in range(opt.n_epochs):
             g_loss = -torch.mean(fake_validity)
             g_loss.backward()
             optimizer_G.step()
-
-            print("[Epoch %d/%d] [Batch %d/%d] [D loss: %f] [G loss: %f]"
-                % (epoch, opt.n_epochs, i, len(fp_loader), d_loss.item(), g_loss.item()))
-            if i == 100:
-                t = time.time() - t0
-                print(t)
-
-            if (batches_done % opt.sample_interval == 0) and batches_done:
+            if i % opt.print_every == 0:
+                print("[Epoch %d/%d] [Batch %d/%d] [D loss: %f] [G loss: %f]"
+                    % (epoch, opt.n_epochs, i, len(fp_loader), d_loss.item(), g_loss.item()))
+            if batches_done % opt.sample_interval == 0:
                 torch.save(generator.state_dict(), './checkpoints/{}_{}.pth'.format(exp_folder, batches_done))
                 visualizeSingleBatch(fp_loader_test, opt)
             batches_done += opt.n_critic
-            
+
+    t = time.time() - t0
+    print("Epoch %d/%d done in %d s" % (epoch, opt.n_epochs, t))

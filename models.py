@@ -149,14 +149,13 @@ class Generator(nn.Module):
         #
         x = self.l1(z)
         x = x.view(-1, 16, self.init_size, self.init_size)
-        x = self.cmp_1(x, given_w).view(-1, *x.shape[1:])
+        x = self.cmp_1(x, given_w)#.view(-1, *x.shape[1:])
         x = self.upsample_1(x)
-        x = self.cmp_2(x, given_w).view(-1, *x.shape[1:])
+        x = self.cmp_2(x, given_w)#.view(-1, *x.shape[1:])
         x = self.upsample_2(x)
-        x = self.decoder(x.view(-1, x.shape[1], *x.shape[2:]))
+        x = self.decoder(x)#.view(-1, x.shape[1], *x.shape[2:]))
         x = x.view(-1, *x.shape[2:])
         return x
-
 
 class Discriminator(nn.Module):
     def __init__(self):
@@ -183,14 +182,13 @@ class Discriminator(nn.Module):
     def forward(self, x, given_y=None, given_w=None, nd_to_sample=None):
         x = x.view(-1, 1, 32, 32)
         # include nodes
-        if True:
-            y = self.l1(given_y)
-            y = y.view(-1, 8, 32, 32)
-            x = torch.cat([x, y], 1)
+        y = self.l1(given_y)
+        y = y.view(-1, 8, 32, 32)
+        x = torch.cat([x, y], 1)
         x = self.encoder(x)
-        x = self.cmp_1(x, given_w).view(-1, *x.shape[1:])
+        x = self.cmp_1(x, given_w)#.view(-1, *x.shape[1:])
         x = self.downsample_1(x)
-        x = self.cmp_2(x, given_w).view(-1, *x.shape[1:])
+        x = self.cmp_2(x, given_w)#.view(-1, *x.shape[1:])
         x = self.downsample_2(x)
         x = self.decoder(x.view(-1, x.shape[1], *x.shape[2:]))
         x = x.view(-1, x.shape[1])
